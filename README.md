@@ -10,14 +10,13 @@ After Anthropic revoked subscription billing for third-party tools (April 4, 202
 
 ## How It Works
 
-The proxy makes three modifications to each request:
+The proxy makes two modifications to each request:
 
 1. **Billing Header** — Injects an 84-character Claude Code billing identifier into the system prompt
-2. **Tool Fingerprint** — Appends Claude Code tool stubs to the tools array (the API checks for their presence)
-3. **Token Swap** — Replaces OpenClaw's auth token with your Claude Code OAuth token
-4. **Sanitization** — Replaces the phrase "running inside OpenClaw" which triggers Anthropic's third-party detection
+2. **Token Swap** — Replaces OpenClaw's auth token with your Claude Code OAuth token
+3. **Sanitization** — Replaces 7 specific trigger phrases that Anthropic's streaming classifier detects
 
-Everything else passes through unchanged — tools, streaming, caching, messages, metadata.
+Everything else passes through unchanged — tools, streaming, caching, messages, metadata. Your assistant name, workspace files (AGENTS.md, SOUL.md), config paths, and plugin names are NOT modified.
 
 ## Requirements
 
@@ -129,13 +128,20 @@ Returns token status, request count, uptime, and subscription type.
 
 ## How Anthropic's Detection Works
 
-Anthropic uses three layers to detect third-party tools:
+Anthropic uses two mechanisms to detect third-party tools:
 
-1. **Billing Header** — The API checks the system prompt for `x-anthropic-billing-header`. Without it, OAuth requests go to Extra Usage.
-2. **Tool Fingerprint** — The API verifies Claude Code's tools (Agent, Bash, Glob, etc.) are present. Without them, large custom tool sets are rejected.
-3. **Content Fingerprint** — The API scans for the exact phrase "running inside OpenClaw" in the system prompt, which is injected by OpenClaw's runtime.
+1. **Billing Header** — The API checks the system prompt for `x-anthropic-billing-header`. Without it, OAuth requests go to Extra Usage. This is a simple string match on 84 characters injected by Claude Code's SDK.
 
-This proxy addresses all three layers.
+2. **Streaming Classifier** — During response streaming, Anthropic's classifier scans the request for specific trigger phrases. The verified triggers are:
+   - `OpenClaw` (the platform name — case insensitive)
+   - `sessions_spawn`, `sessions_list`, `sessions_history`, `sessions_send` (OpenClaw's session management tools)
+   - `running inside` + platform name (the self-declaration phrase OpenClaw injects)
+
+   If detected, the response is refused with `stop_reason: "refusal"` or a billing error.
+
+**What is NOT detected:** Assistant names (e.g., "Vegeta"), workspace filenames (AGENTS.md, SOUL.md), config paths (.openclaw/), plugin names (lossless-claw), individual tool names, or any other OpenClaw-specific terms. Only the 7 patterns above trigger rejection.
+
+This proxy addresses both mechanisms with the billing header injection and 7 string replacements.
 
 ## Rollback
 

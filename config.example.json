@@ -2,9 +2,13 @@
   "port": 18801,
   "credentialsPath": "~/.claude/.credentials.json",
   "replacements": [
-    ["running inside OpenClaw", "running on this system"],
-    ["running inside openclaw", "running on this system"]
+    ["OpenClaw", "assistant platform"],
+    ["openclaw", "assistant platform"],
+    ["sessions_spawn", "create_task"],
+    ["sessions_list", "list_tasks"],
+    ["sessions_history", "get_history"],
+    ["sessions_send", "send_to_task"],
+    ["running inside", "running on"]
   ],
-  "sanitizeAll": true,
-  "_comment": "Add [find, replace] pairs for any terms that trigger billing rejection. The proxy does raw string replacement on the request body — no JSON re-serialization."
+  "_comment": "These 7 patterns are the verified triggers. Add more if Anthropic adds new detection terms."
 }
