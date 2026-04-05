@@ -20,12 +20,12 @@
 7. `running inside` — the self-declaration phrase ("running inside OpenClaw")
 
 **Confirmed safe (NOT detected):**
-- Assistant names (e.g., "Vegeta")
+- Assistant names (e.g., "custom assistant name")
 - Workspace files (AGENTS.md, SOUL.md, USER.md)
 - Config paths (.openclaw/, openclaw.json)
 - Plugin names (lossless-claw)
 - Individual tool names (exec, lcm_grep, gateway, cron, etc.)
-- Bot names (VegetaAssistantBot)
+- Bot names (custom assistant nameAssistantBot)
 - Runtime references (pi-embedded, pi-ai)
 
 **Testing:** Validated with 478+ real OpenClaw requests on production instance.
