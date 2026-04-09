@@ -83,36 +83,53 @@ const DEFAULT_REVERSE_MAP = [
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 function loadConfig() {
+  // Config precedence: PROXY_PORT env > --port CLI > config.json port > DEFAULT_PORT
   const args = process.argv.slice(2);
   let configPath = null;
-  let port = DEFAULT_PORT;
+  let cliPort = null;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--port' && args[i + 1]) port = parseInt(args[i + 1]);
+    if (args[i] === '--port' && args[i + 1]) cliPort = parseInt(args[i + 1]);
     if (args[i] === '--config' && args[i + 1]) configPath = args[i + 1];
   }
 
+  const envPort = process.env.PROXY_PORT ? parseInt(process.env.PROXY_PORT) : null;
+
   let config = {};
   if (configPath && fs.existsSync(configPath)) {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e) {
+      console.error('[ERROR] Failed to parse config: ' + configPath + ' (' + e.message + ')');
+      process.exit(1);
+    }
   } else if (fs.existsSync('config.json')) {
-    config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+    try { config = JSON.parse(fs.readFileSync('config.json', 'utf8')); } catch(e) {
+      console.error('[PROXY] Warning: config.json is invalid, using defaults. (' + e.message + ')');
+    }
   }
 
   // Find Claude Code credentials
   const homeDir = os.homedir();
+
+  // OAUTH_TOKEN env var takes precedence over all file-based credentials
+  let credsPath = null;
+  if (process.env.OAUTH_TOKEN) {
+    credsPath = 'env';
+    console.log('[PROXY] Using OAUTH_TOKEN from environment variable.');
+  }
+
   const credsPaths = [
     config.credentialsPath,
     path.join(homeDir, '.claude', '.credentials.json'),
     path.join(homeDir, '.claude', 'credentials.json')
   ].filter(Boolean);
 
-  let credsPath = null;
-  for (const p of credsPaths) {
-    const resolved = p.startsWith('~') ? path.join(homeDir, p.slice(1)) : p;
-    if (fs.existsSync(resolved) && fs.statSync(resolved).size > 0) {
-      credsPath = resolved;
-      break;
+  if (!credsPath) {
+    for (const p of credsPaths) {
+      const resolved = p.startsWith('~') ? path.join(homeDir, p.slice(1)) : p;
+      if (fs.existsSync(resolved) && fs.statSync(resolved).size > 0) {
+        credsPath = resolved;
+        break;
+      }
     }
   }
 
@@ -155,7 +172,7 @@ function loadConfig() {
   }
 
   return {
-    port: config.port || port,
+    port: envPort || cliPort || config.port || DEFAULT_PORT,
     credsPath,
     replacements: config.replacements || DEFAULT_REPLACEMENTS,
     reverseMap: config.reverseMap || DEFAULT_REVERSE_MAP
@@ -164,6 +181,12 @@ function loadConfig() {
 
 // ─── Token Management ───────────────────────────────────────────────────────
 function getToken(credsPath) {
+  // Env var sentinel: return synthetic OAuth object without file I/O
+  if (credsPath === 'env') {
+    const token = process.env.OAUTH_TOKEN;
+    if (!token) throw new Error('OAUTH_TOKEN env var is empty.');
+    return { accessToken: token, expiresAt: Infinity, subscriptionType: 'env-var' };
+  }
   const raw = fs.readFileSync(credsPath, 'utf8');
   const creds = JSON.parse(raw);
   const oauth = creds.claudeAiOauth;
@@ -232,7 +255,7 @@ function startServer(config) {
           proxy: 'openclaw-billing-proxy',
           requestsServed: requestCount,
           uptime: Math.floor((Date.now() - startedAt) / 1000) + 's',
-          tokenExpiresInHours: expiresIn.toFixed(1),
+          tokenExpiresInHours: isFinite(expiresIn) ? expiresIn.toFixed(1) : 'n/a',
           subscriptionType: oauth.subscriptionType,
           replacementPatterns: config.replacements.length,
           reverseMapPatterns: config.reverseMap.length
@@ -333,15 +356,18 @@ function startServer(config) {
     });
   });
 
-  server.listen(config.port, '127.0.0.1', () => {
+  const bindHost = process.env.PROXY_HOST || '127.0.0.1';
+  server.listen(config.port, bindHost, () => {
     try {
       const oauth = getToken(config.credsPath);
-      const h = ((oauth.expiresAt - Date.now()) / 3600000).toFixed(1);
+      const expiresIn = (oauth.expiresAt - Date.now()) / 3600000;
+      const h = isFinite(expiresIn) ? expiresIn.toFixed(1) + 'h' : 'n/a (env var)';
       console.log(`\n  OpenClaw Billing Proxy`);
       console.log(`  ---------------------`);
       console.log(`  Port:          ${config.port}`);
+      console.log(`  Bind address:  ${bindHost}`);
       console.log(`  Subscription:  ${oauth.subscriptionType}`);
-      console.log(`  Token expires: ${h}h`);
+      console.log(`  Token expires: ${h}`);
       console.log(`  Patterns:      ${config.replacements.length} sanitization + ${config.reverseMap.length} reverse`);
       console.log(`  Credentials:   ${config.credsPath}`);
       console.log(`\n  Ready. Set openclaw.json baseUrl to http://127.0.0.1:${config.port}\n`);

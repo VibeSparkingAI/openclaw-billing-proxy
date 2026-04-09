@@ -129,6 +129,38 @@ If you have a custom assistant name that Anthropic blocks (test by checking if r
 
 ## Running as a Service
 
+### Docker
+
+```bash
+# Start the proxy (uses ~/.claude credentials by default)
+docker compose up -d
+
+# Verify
+curl http://127.0.0.1:18801/health
+```
+
+**With an OAuth token instead of credential file:**
+```bash
+# Copy and edit the environment file
+cp .env.example .env
+# Set OAUTH_TOKEN in .env
+
+docker compose up -d
+```
+
+**Custom port:**
+```bash
+PROXY_PORT=9000 docker compose up -d
+```
+
+**Custom replacement rules:**
+
+Uncomment the `config.json` volume mount in `docker-compose.yml`, then create a `config.json` (copy from `config.example.json` and edit).
+
+See `.env.example` for all available environment variables.
+
+> **Note:** macOS Keychain credential extraction does not work inside Docker. Use the `~/.claude` volume mount (default) or set `OAUTH_TOKEN` in `.env`.
+
 ### Linux (systemd)
 ```bash
 sudo tee /etc/systemd/system/openclaw-proxy.service << EOF

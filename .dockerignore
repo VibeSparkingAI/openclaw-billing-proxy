@@ -1,0 +1,11 @@
+.git
+.gitignore
+*.md
+config.json
+setup.js
+troubleshoot.js
+.spec-workflow/
+*.log
+node_modules/
+.env
+.env.*
