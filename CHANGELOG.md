@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4.1 -- 2026-04-08
+
+### UTF-8 BOM handling fix
+
+**Changes:**
+- `proxy.js` now strips UTF-8 BOM (byte order mark) from the credentials file
+  before parsing JSON. Prevents intermittent `HTTP 500: Unexpected token` errors
+  when the credentials file is rewritten with BOM encoding.
+
+**Why:**
+PowerShell and some editors add a UTF-8 BOM (`EF BB BF`) when writing files.
+Claude Code's token auto-refresh can trigger a file rewrite that introduces the
+BOM. The proxy's `JSON.parse()` fails on the invisible BOM character, causing
+all API requests to return 500 until the file is manually cleaned. This fix
+makes the proxy resilient to BOM-encoded credentials files automatically.
+
+**Symptoms before fix:**
+- `HTTP 500 error: Credentials: Unexpected token, "{ "c"... is not valid JSON`
+- Intermittent failures after token refresh
+- Proxy health endpoint returns `{"status":"error","message":"Unexpected token..."}`
+
+---
+
 ## v1.4.0 -- 2026-04-06
 
 ### macOS Keychain support

@@ -271,6 +271,13 @@ This tests 8 layers independently (credentials, token, API, billing header, trig
 - Open Claude Code CLI briefly -- it auto-refreshes on startup
 - Or run: `claude -p "ping" --max-turns 1 --no-session-persistence`
 
+**HTTP 500: "Unexpected token" / Invalid JSON in credentials**
+- The credentials file has a UTF-8 BOM (byte order mark) -- an invisible character at the start
+- This happens when PowerShell or other editors rewrite the file, or after token auto-refresh
+- v1.4.1+ handles this automatically by stripping the BOM before parsing
+- Manual fix: `node -e "const fs=require('fs');let c=fs.readFileSync(process.env.HOME+'/.claude/.credentials.json','utf8');if(c.charCodeAt(0)===0xFEFF)fs.writeFileSync(process.env.HOME+'/.claude/.credentials.json',c.slice(1))"`
+- Verify with: `node -e "JSON.parse(require('fs').readFileSync(process.env.HOME+'/.claude/.credentials.json','utf8'));console.log('OK')"`
+
 **Tool execution fails / wrong file paths**
 - If the model references `.ocplatform/` instead of `.openclaw/`, your `reverseMap` is missing entries
 - Ensure every `replacements` entry has a matching `reverseMap` entry

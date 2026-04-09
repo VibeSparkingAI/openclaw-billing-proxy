@@ -187,7 +187,9 @@ function getToken(credsPath) {
     if (!token) throw new Error('OAUTH_TOKEN env var is empty.');
     return { accessToken: token, expiresAt: Infinity, subscriptionType: 'env-var' };
   }
-  const raw = fs.readFileSync(credsPath, 'utf8');
+  let raw = fs.readFileSync(credsPath, 'utf8');
+  // Strip UTF-8 BOM if present (PowerShell and some editors add this)
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
   const creds = JSON.parse(raw);
   const oauth = creds.claudeAiOauth;
   if (!oauth || !oauth.accessToken) {
